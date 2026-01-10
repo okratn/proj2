@@ -16,6 +16,7 @@ public class Heap
     public int totalLinks;
     public int totalCuts;
     public int totalHeapifyCosts;
+    public int _numMarkedNodes;
     
     /**
      *
@@ -31,6 +32,7 @@ public class Heap
         this.totalLinks = 0;
         this.totalCuts = 0;
         this.totalHeapifyCosts = 0;
+        this._numMarkedNodes = 0;
         // student code can be added here
     }
 
@@ -82,7 +84,10 @@ public class Heap
      */
     public HeapItem findMin()
     {
-        return null; // should be replaced by student code
+        if (this.min == null){
+            return null;
+        }
+        return this.min; // should be replaced by student code
     }
 
     /**
@@ -139,6 +144,7 @@ public class Heap
             this.totalLinks = heap2.totalLinks;
             this.totalCuts = heap2.totalCuts;
             this.totalHeapifyCosts = heap2.totalHeapifyCosts;
+            this._numMarkedNodes = heap2._numMarkedNodes;
             
             return;
 
@@ -149,16 +155,18 @@ public class Heap
         HeapNode root1 = this.min.node;
         appendNodes(root1, root2);
 
+        //Update min pointer
         if(heap2.min.key < this.min.key){
             this.min = heap2.min;
         }
 
-        //Updating global attributes**
+        //Updating global attributes- according yo Lazy meld (non-lazy meld will adjust accordingly)
         this.size += heap2.size;
         this.numTrees += heap2.numTrees;
         this.totalLinks += heap2.totalLinks;
         this.totalCuts += heap2.totalCuts;
         this.totalHeapifyCosts += heap2.totalHeapifyCosts;
+        this._numMarkedNodes += heap2._numMarkedNodes;
 
         //If this is not a lazy meld, we need to consolidate
         if (!lazyMelds){
@@ -172,12 +180,59 @@ public class Heap
     /**
      * Consolidate function  joins trees of the same rank, leaving only one tree for each rank
      */
-    private static consolidate(){
-        //1: ranks list
-        //Need to itterate over the tree ranks
+    private void consolidate(){
+        //1: ranks list - needs to be of size(logn) of the current list
+        int n = this.size;
+        // golden ratio for a tighter bound on max degree
+        double phi = (1.0 + Math.sqrt(5.0)) / 2.0;
+        int maxDegree = (int) Math.floor(Math.log(Math.max(1, n)) / Math.log(phi)) + 2;
+        HeapNode[] ranksArray = new HeapNode[maxDegree + 5];
 
+        //Keep a pointer to all of the roots
+        HeapNode[] rootsArray = new HeapNode[this.numTrees];
+        HeapNode curr = this.min.node;
+        for (int i = 0 ; i < rootsArray.length ; i++){
+            rootsArray[i] = curr;
+            curr = curr.next;
+        }
 
+        for (HeapNode root : rootsArray) {
+            root.next = root;
+            root.prev = root;
+        }
 
+        //Consolidating, connecting each node in the rootsArray
+        for(HeapNode curr_root : rootsArray){
+            int curr_rank = curr_root.rank;
+            while(ranksArray[curr_rank] != null){
+                HeapNode existing_root = ranksArray[curr_rank];
+                curr_root = this.link(existing_root, curr_root);
+                ranksArray[curr_rank] = null;
+                curr_rank = curr_root.rank; 
+            }
+            ranksArray[curr_rank] = curr_root;
+            curr_root = curr_root.next;
+        }
+
+        //Re-build the roots list
+        this.min = null;
+        this.numTrees = 0;
+        for (HeapNode node : ranksArray){
+            if (node != null){
+            this.numTrees ++;
+            if (this.min == null){
+                this.min = node.item;
+                node.next = node;
+                node.prev = node;
+            }
+            else {
+                this.appendNodes(this.min.node, node);
+                if (node.item.key < this.min.key){
+                    this.min = node.item;
+                }
+            }
+        }
+        }
     }
 
 
@@ -186,7 +241,7 @@ public class Heap
      * 
      * @return
      */
-    private void link(HeapNode node1, HeapNode node2) {
+    private HeapNode link(HeapNode node1, HeapNode node2) {
         // Link node2 as son of node1
         HeapNode parent, newChild, child;
         if (node1.item.key < node2.item.key) {
@@ -195,15 +250,28 @@ public class Heap
         } else {
             parent = node2;
             newChild = node1;
-
         }
+        // Disconnecting the newChild from the rest of the brothers.
+        newChild.prev.next = newChild.next;
+        newChild.next.prev = newChild.prev;
+
+        newChild.next = newChild;
+        newChild.prev = newChild;
+
         //current child list is empty, we want to append to this list
+        if (newChild.mark){//A node that was a root, must always be marked false
+            newChild.mark = false; 
+            this._numMarkedNodes --; 
+        }
+
         child = parent.child;
         newChild.parent = parent; //Do all children need to point to parent**?
 
         if (child == null){ //if we don't have any children, create a new list
             parent.child = newChild;
             newChild.parent = parent;
+            newChild.next = newChild;
+            newChild.prev = newChild;
         }
         else { //Add to and existing list of child nodes
             
@@ -211,11 +279,18 @@ public class Heap
             }
         
         parent.rank++;
-        return;
+        this.numTrees--;
+        this.totalLinks++;
+        return parent;
 
         }
 
-
+    /**
+     * 
+     * @param node1
+     * @param node2
+     * Adds a new node to the heaps nodes list (adds a brother)
+     */
     private void appendNodes(HeapNode node1, HeapNode node2){
         HeapNode next1, next2;
         next1 = node1.next;
@@ -237,11 +312,12 @@ public class Heap
      * Return the number of elements in the heap
      *   
      */
-    public int size()
-    {
-        return 46; // should be replaced by student code
-    }
-
+    public int size() {
+        if (this.min == null) {
+                return 0;
+            }
+            return this.size;
+        }
 
     /**
      * 
@@ -250,7 +326,7 @@ public class Heap
      */
     public int numTrees()
     {
-        return 46; // should be replaced by student code
+        return this.numTrees; // should be replaced by student code
     }
     
     
@@ -272,7 +348,7 @@ public class Heap
      */
     public int totalLinks()
     {
-        return 46; // should be replaced by student code
+        return this.totalLinks;
     }
     
     
@@ -335,5 +411,65 @@ public class Heap
             this.key = key;
             this.info = info;
         }
+    }
+    
+    public void print() {
+    System.out.println("--- Fibonacci Heap Structure ---");
+    if (this.min == null) {
+        System.out.println("Empty Heap");
+        return;
+    }
+    
+    HeapNode curr = this.min.node;
+    // We use a do-while because it's a circular list
+    do {
+        printTree(curr, 0);
+        curr = curr.next;
+    } while (curr != this.min.node);
+    System.out.println("--------------------------------");
+    }
+
+    // private void printTree(HeapNode node, int level) {
+    //     if (node == null) return;
+
+    //     // Indentation based on depth (level)
+    //     for (int i = 0; i < level; i++) {
+    //         System.out.print("  | ");
+    //     }
+
+    //     // Print the key and rank
+    //     System.out.println("Key: " + node.item.key + " (Rank: " + node.rank + ")");
+
+    //     // Recursively print children
+    //     if (node.child != null) {
+    //         HeapNode child = node.child;
+    //         HeapNode firstChild = child;
+    //         do {
+    //             printTree(child, level + 1);
+    //             child = child.next;
+    //         } while (child != firstChild);
+    //     }
+    // }
+    private void printTree(HeapNode node, int level) {
+    if (node == null) return;
+
+    String indent = "";
+    for (int i = 0; i < level; i++) {
+        indent += "    ";
+    }
+
+    // Labeling the relationship
+    String relation = (level == 0) ? "[Root] " : "[Child of " + node.parent.item.key + "] ";
+    
+    System.out.println(indent + relation + "Key: " + node.item.key + " (Rank: " + node.rank + ")");
+
+    if (node.child != null) {
+        HeapNode child = node.child;
+        HeapNode firstChild = child;
+        do {
+            printTree(child, level + 1);
+            child = child.next;
+        } while (child != firstChild);
+    }
     }
 }
