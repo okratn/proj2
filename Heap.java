@@ -87,7 +87,19 @@ public class Heap
         if (this.min == null){
             return null;
         }
-        return this.min; // should be replaced by student code
+        //iterate over all roots to find the min
+        HeapNode some_root= this.min.node; // temporary min
+        do {
+            if (some_root.item.key < this.min.key){
+                this.min = some_root.item;
+            }
+            some_root = some_root.next;
+        } while (some_root != this.min.node);
+    
+
+
+
+        return this.min; 
     }
 
     /**
@@ -97,7 +109,86 @@ public class Heap
      */
     public void deleteMin()
     {
-        return; // should be replaced by student code
+        HeapNode min_node = this.min.node;
+        
+        // Case 1: empty heap
+        if (min_node == null) {
+            return;
+        }
+        
+        // Case 2: heap with only one node
+        if (this.size == 1) {
+            this.min = null;
+            this.numTrees = 0;
+            this.size = 0;
+            return;
+        }
+        
+        // Case 3: min is the only root
+        if (min_node.next == min_node) {
+            // Only min in root list, promote all its children to roots
+            if (min_node.child != null) {
+                HeapNode child = min_node.child;
+                HeapNode firstChild = child;
+                
+                // Disconnect all children from parent and count them
+                int childCount = 0;
+                do {
+                    child.parent = null;
+                    childCount++;
+                    child = child.next;
+                } while (child != firstChild);
+                
+                this.min = firstChild.item; // temporary min
+                this.numTrees = childCount;
+            } else {
+                // Min was the only node (shouldn't happen due to size check, but just in case)
+                this.min = null;
+                this.numTrees = 0;
+            }
+        } else {
+            // Case 4: min is one of multiple roots
+            // Remove min from root list
+            min_node.prev.next = min_node.next;
+            min_node.next.prev = min_node.prev;
+            
+            // Get a reference to a remaining root and detach min from the root list
+            HeapNode someRoot = min_node.next;
+            min_node.next = min_node;
+            min_node.prev = min_node;
+            
+            // Add min's children to root list
+            if (min_node.child != null) {
+                HeapNode child = min_node.child;
+                HeapNode firstChild = child;
+
+                do {
+                    child.parent = null;
+                    child = child.next;
+                } while (child != firstChild);
+
+                // Splice the entire child list into the root list once.
+                this.appendNodes(someRoot, firstChild);
+                this.numTrees = this.numTrees - 1 + min_node.rank;
+            } else {
+                // Min had no children
+                this.numTrees--;
+            }
+            
+            // Ensure min points to a valid root before scanning
+            this.min = someRoot.item;
+            this.min = findMin();
+        }
+        
+        this.size--;
+        
+        // Find new actual minimum 
+        this.min = findMin();
+        
+        // Consolidate if not lazy
+        if (!this.lazyMelds) {
+            this.consolidate();
+        }
     }
 
     /**
@@ -109,7 +200,25 @@ public class Heap
      */
     public void decreaseKey(HeapItem x, int diff) 
     {    
-        return; // should be replaced by student code
+        HeapNode x_node = x.node;
+        if (diff < 0 ) {
+            throw new IllegalArgumentException("diff must be in the positive range");
+        }
+
+            x.key -= diff;
+        HeapNode parent = x_node.parent;
+        if (parent != null && x.key < parent.item.key) {
+   
+        if (lazyDecreaseKeys) {
+            cascadingCut(x_node);
+        } else {
+            heapify_up(x_node);
+        }
+    }
+        if (this.min == null || x.key < this.min.key) {
+            this.min = x;
+        }
+        return;
     }
 
     /**
@@ -117,8 +226,90 @@ public class Heap
      * Delete the x from the heap.
      *
      */
+
+
+    public void heapify_up(HeapNode node) {
+        HeapNode parent = node.parent;
+        while(parent != null && node.item.key < parent.item.key) {
+            HeapItem temp = node.item;
+            node.item = parent.item;
+            parent.item = temp;
+            node.item.node = node;
+            parent.item.node = parent;
+
+            node = parent;
+            parent = node.parent;
+            this.totalHeapifyCosts++;
+
+        }
+    return;
+    }
+
+
+
+
+    public void cascadingCut(HeapNode node) {
+        if (node.parent == null) {
+            return; // Node is a root, no need to cut
+        }
+
+        HeapNode parent = node.parent;
+
+        // Remove node from its sibling list
+        node.prev.next = node.next;
+        node.next.prev = node.prev;
+
+        // Update parent's child pointer if necessary
+        if (parent.child == node) {
+            if (node.next != node) {
+                parent.child = node.next;
+            } else {
+                parent.child = null;
+            }
+        }
+
+        parent.rank--;
+
+        // meld node and its siblings into the root list
+        node.parent = null;
+        node.next = node;
+        node.prev = node;
+        Heap tmp_heap2 = new Heap(this.lazyMelds, this.lazyDecreaseKeys);
+        tmp_heap2.min = node.item;
+        tmp_heap2.numTrees = 1;
+        tmp_heap2.size = 0; // size is not relevant here , cascading cut doesn't affect size
+        this.meld(tmp_heap2);
+
+        
+ 
+
+        this.totalCuts++;
+        
+
+        // Handle marking
+        if (node.mark == true) {
+             node.mark = false;// Node is now a root, unmark it
+             this._numMarkedNodes--; }
+        
+        if (parent.parent == null) {
+            return; // Parent is a root, no further action needed
+        }
+        
+        if (parent.mark == false) {
+            parent.mark = true;
+            this._numMarkedNodes++;
+        } else {
+            cascadingCut(parent);
+        }
+
+   
+        return;
+    }
+
     public void delete(HeapItem x) 
     {    
+        decreaseKey(x,Integer.MAX_VALUE); // decrease to negative infinity
+        deleteMin();
         return; // should be replaced by student code
     }
 
@@ -156,7 +347,7 @@ public class Heap
         appendNodes(root1, root2);
 
         //Update min pointer
-        if(heap2.min.key < this.min.key){
+        if(heap2.min.key < this.min.key) {
             this.min = heap2.min;
         }
 
@@ -337,7 +528,7 @@ public class Heap
      */
     public int numMarkedNodes()
     {
-        return 46; // should be replaced by student code
+        return this._numMarkedNodes; // should be replaced by student code
     }
     
     
@@ -359,7 +550,7 @@ public class Heap
      */
     public int totalCuts()
     {
-        return 46; // should be replaced by student code
+        return this.totalCuts; // should be replaced by student code
     }
     
 
@@ -370,7 +561,7 @@ public class Heap
      */
     public int totalHeapifyCosts()
     {
-        return 46; // should be replaced by student code
+        return this.totalHeapifyCosts; // should be replaced by student code
     }
     
     
@@ -421,10 +612,16 @@ public class Heap
     }
     
     HeapNode curr = this.min.node;
+    int guard = 0;
     // We use a do-while because it's a circular list
     do {
         printTree(curr, 0);
         curr = curr.next;
+        guard++;
+        if (guard > this.size + 1) {
+            System.out.println("WARNING: root list traversal exceeded size; possible cycle corruption.");
+            break;
+        }
     } while (curr != this.min.node);
     System.out.println("--------------------------------");
     }
@@ -452,6 +649,14 @@ public class Heap
     // }
     private void printTree(HeapNode node, int level) {
     if (node == null) return;
+    if (level > this.size + 1) {
+        System.out.println("WARNING: printTree depth exceeded size; possible parent/child cycle at key " + node.item.key + ".");
+        return;
+    }
+    if (node.child == node) {
+        System.out.println("WARNING: node is its own child at key " + node.item.key + ".");
+        return;
+    }
 
     String indent = "";
     for (int i = 0; i < level; i++) {
@@ -466,9 +671,15 @@ public class Heap
     if (node.child != null) {
         HeapNode child = node.child;
         HeapNode firstChild = child;
+        int guard = 0;
         do {
             printTree(child, level + 1);
             child = child.next;
+            guard++;
+            if (guard > this.size + 1) {
+                System.out.println("WARNING: child list traversal exceeded size at node " + node.item.key + ".");
+                break;
+            }
         } while (child != firstChild);
     }
     }
