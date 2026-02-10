@@ -88,21 +88,6 @@ public class Heap
      */
     public HeapItem findMin()
     {
-        if (this.min == null){
-            this.firstRoot = null;
-            return null;
-        }
-        //iterate over all roots to find the min
-        HeapNode some_root= this.min.node; // temporary min
-        do {
-            if (some_root.item.key < this.min.key){
-                this.min = some_root.item;
-            }
-            some_root = some_root.next;
-        } while (some_root != this.min.node);
-    
-
-
         syncFirstRoot();
         return this.min; 
     }
@@ -186,15 +171,24 @@ public class Heap
                 this.numTrees--;
             }
             
-            // Ensure min points to a valid root before scanning
+            // Set min to any valid root temporarily; consolidate() will find the true min
             this.min = someRoot.item;
-            this.min = findMin();
         }
         
         this.size--;
         
-        // Find new actual minimum 
-        this.min = findMin();
+        // Scan root list to find the true minimum before consolidation,
+        // so that consolidate() traverses from a deterministic starting point.
+        if (this.min != null) {
+            HeapNode scanNode = this.min.node;
+            HeapNode scanStart = scanNode;
+            do {
+                if (scanNode.item.key < this.min.key) {
+                    this.min = scanNode.item;
+                }
+                scanNode = scanNode.next;
+            } while (scanNode != scanStart);
+        }
         
         // Always consolidate after deleteMin - this is required for all heap variants
         // The lazyMelds flag only affects meld() and insert(), not deleteMin()
@@ -319,7 +313,6 @@ public class Heap
     {    
         decreaseKey(x,Integer.MAX_VALUE); // decrease to negative infinity
         deleteMin();
-        return; // should be replaced by student code
     }
 
 
@@ -515,11 +508,10 @@ public class Heap
     }
 
     private boolean isMarked(HeapNode node) {
-        return node.marked;
+        return node.mark;
     }
 
     private void setMarked(HeapNode node, boolean value) {
-        node.marked = value;
         node.mark = value;
     }
 
@@ -602,7 +594,6 @@ public class Heap
         public HeapNode prev;
         public HeapNode parent;
         public int rank;
-        public boolean marked;
         public boolean mark;
 
         public HeapNode(HeapItem item){
@@ -612,7 +603,6 @@ public class Heap
             this.prev = this;
             this.parent = null;
             this.rank = 0;
-            this.marked = false;
             this.mark = false;
         }
     }
