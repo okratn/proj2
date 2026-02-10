@@ -11,6 +11,7 @@ public class Heap
     public final boolean lazyMelds;
     public final boolean lazyDecreaseKeys;
     public HeapItem min;
+    public HeapNode firstRoot;
     public int numTrees;
     public int size;
     public int totalLinks;
@@ -33,6 +34,7 @@ public class Heap
         this.totalCuts = 0;
         this.totalHeapifyCosts = 0;
         this._numMarkedNodes = 0;
+        this.firstRoot = null;
         // student code can be added here
     }
 
@@ -45,9 +47,9 @@ public class Heap
      */
     public HeapItem insert(int key, String info) 
     {    
-        if (key <= 0)
+        if (key < 0)
         {
-            throw new IllegalArgumentException("key must be > 0");
+            throw new IllegalArgumentException("key must be >= 0");
         }
 
         HeapItem item = new HeapItem(key, info);
@@ -63,6 +65,7 @@ public class Heap
         node.prev = node;
         this.size = 1;
         this.numTrees = 1;
+        this.firstRoot = node;
 
         return item;
         }
@@ -73,6 +76,7 @@ public class Heap
         heap2.size = 1;
         heap2.numTrees = 1;
         this.meld(heap2);
+        syncFirstRoot();
         return item;
 
     }
@@ -85,6 +89,7 @@ public class Heap
     public HeapItem findMin()
     {
         if (this.min == null){
+            this.firstRoot = null;
             return null;
         }
         //iterate over all roots to find the min
@@ -98,7 +103,7 @@ public class Heap
     
 
 
-
+        syncFirstRoot();
         return this.min; 
     }
 
@@ -109,10 +114,15 @@ public class Heap
      */
     public void deleteMin()
     {
+        if (this.min == null) {
+            this.firstRoot = null;
+            return;
+        }
         HeapNode min_node = this.min.node;
         
         // Case 1: empty heap
         if (min_node == null) {
+            this.firstRoot = null;
             return;
         }
         
@@ -121,6 +131,7 @@ public class Heap
             this.min = null;
             this.numTrees = 0;
             this.size = 0;
+            this.firstRoot = null;
             return;
         }
         
@@ -185,10 +196,10 @@ public class Heap
         // Find new actual minimum 
         this.min = findMin();
         
-        // Consolidate if not lazy
-        if (!this.lazyMelds) {
-            this.consolidate();
-        }
+        // Always consolidate after deleteMin - this is required for all heap variants
+        // The lazyMelds flag only affects meld() and insert(), not deleteMin()
+        this.consolidate();
+        syncFirstRoot();
     }
 
     /**
@@ -218,6 +229,7 @@ public class Heap
         if (this.min == null || x.key < this.min.key) {
             this.min = x;
         }
+        syncFirstRoot();
         return;
     }
 
@@ -270,33 +282,30 @@ public class Heap
 
         parent.rank--;
 
-        // meld node and its siblings into the root list
+        // Meld node into the root list
         node.parent = null;
         node.next = node;
         node.prev = node;
         Heap tmp_heap2 = new Heap(this.lazyMelds, this.lazyDecreaseKeys);
         tmp_heap2.min = node.item;
         tmp_heap2.numTrees = 1;
-        tmp_heap2.size = 0; // size is not relevant here , cascading cut doesn't affect size
+        tmp_heap2.size = 0; // size is not relevant here, cascading cut doesn't affect size
         this.meld(tmp_heap2);
-
-        
- 
 
         this.totalCuts++;
         
 
         // Handle marking
-        if (node.mark == true) {
-             node.mark = false;// Node is now a root, unmark it
+        if (isMarked(node)) {
+             setMarked(node, false);// Node is now a root, unmark it
              this._numMarkedNodes--; }
         
         if (parent.parent == null) {
             return; // Parent is a root, no further action needed
         }
         
-        if (parent.mark == false) {
-            parent.mark = true;
+        if (!isMarked(parent)) {
+            setMarked(parent, true);
             this._numMarkedNodes++;
         } else {
             cascadingCut(parent);
@@ -325,6 +334,7 @@ public class Heap
     {
         //Check the heap2 isn't empty
         if (heap2 == null || heap2.min == null){
+            syncFirstRoot();
             return;
         }        
         // Current heap is empty
@@ -336,6 +346,7 @@ public class Heap
             this.totalCuts = heap2.totalCuts;
             this.totalHeapifyCosts = heap2.totalHeapifyCosts;
             this._numMarkedNodes = heap2._numMarkedNodes;
+            syncFirstRoot();
             
             return;
 
@@ -363,6 +374,7 @@ public class Heap
         if (!lazyMelds){
             this.consolidate();
         }
+        syncFirstRoot();
 
         return; // should be replaced by student code           
     }
@@ -424,6 +436,7 @@ public class Heap
             }
         }
         }
+        syncFirstRoot();
     }
 
 
@@ -450,8 +463,8 @@ public class Heap
         newChild.prev = newChild;
 
         //current child list is empty, we want to append to this list
-        if (newChild.mark){//A node that was a root, must always be marked false
-            newChild.mark = false; 
+        if (isMarked(newChild)){//A node that was a root, must always be marked false
+            setMarked(newChild, false); 
             this._numMarkedNodes --; 
         }
 
@@ -495,6 +508,19 @@ public class Heap
 
         return;
 
+    }
+
+    private void syncFirstRoot() {
+        this.firstRoot = (this.min != null) ? this.min.node : null;
+    }
+
+    private boolean isMarked(HeapNode node) {
+        return node.marked;
+    }
+
+    private void setMarked(HeapNode node, boolean value) {
+        node.marked = value;
+        node.mark = value;
     }
 
     
@@ -576,6 +602,7 @@ public class Heap
         public HeapNode prev;
         public HeapNode parent;
         public int rank;
+        public boolean marked;
         public boolean mark;
 
         public HeapNode(HeapItem item){
@@ -585,6 +612,7 @@ public class Heap
             this.prev = this;
             this.parent = null;
             this.rank = 0;
+            this.marked = false;
             this.mark = false;
         }
     }

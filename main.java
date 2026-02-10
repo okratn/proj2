@@ -14,7 +14,7 @@ class Main {
 
         // 2. Test Non-Lazy Melds (Immediate Consolidation)
         System.out.println("TESTING NON-LAZY MELD HEAP:");
-        Heap nonLazyHeap = new Heap(false, true);
+        Heap nonLazyHeap = new Heap(true, true);
         nonLazyHeap.insert(10, "A");
         Heap.HeapItem itemB = nonLazyHeap.insert(20, "B"); // Should link with 10
         nonLazyHeap.insert(5, "C");
